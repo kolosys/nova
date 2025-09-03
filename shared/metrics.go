@@ -30,6 +30,9 @@ type MetricsCollector interface {
 
 	// SetActiveListeners sets current active listeners count
 	SetActiveListeners(emitterID string, count int)
+
+	// IncEventsDropped increments dropped events counter
+	IncEventsDropped(component string, reason string)
 }
 
 // NoOpMetricsCollector provides a no-op implementation for when metrics are disabled
@@ -45,7 +48,8 @@ func (n NoOpMetricsCollector) IncEventsProcessed(listenerID string, result strin
 func (n NoOpMetricsCollector) ObserveListenerDuration(listenerID string, duration time.Duration) {}
 
 // ObserveSagaDuration does nothing
-func (n NoOpMetricsCollector) ObserveSagaDuration(sagaID string, step string, duration time.Duration) {}
+func (n NoOpMetricsCollector) ObserveSagaDuration(sagaID string, step string, duration time.Duration) {
+}
 
 // ObserveStoreAppendDuration does nothing
 func (n NoOpMetricsCollector) ObserveStoreAppendDuration(duration time.Duration) {}
@@ -59,10 +63,14 @@ func (n NoOpMetricsCollector) SetQueueSize(component string, size int) {}
 // SetActiveListeners does nothing
 func (n NoOpMetricsCollector) SetActiveListeners(emitterID string, count int) {}
 
+// IncEventsDropped does nothing
+func (n NoOpMetricsCollector) IncEventsDropped(component string, reason string) {}
+
 // SimpleMetricsCollector provides a basic in-memory metrics collector for testing
 type SimpleMetricsCollector struct {
 	EventsEmitted     int64
 	EventsProcessed   int64
+	EventsDropped     int64
 	ListenerDurations int64
 	SagaDurations     int64
 	StoreAppends      int64
@@ -119,6 +127,11 @@ func (s *SimpleMetricsCollector) SetActiveListeners(emitterID string, count int)
 	s.ActiveListeners[emitterID] = int64(count)
 }
 
+// IncEventsDropped increments dropped events counter
+func (s *SimpleMetricsCollector) IncEventsDropped(component string, reason string) {
+	atomic.AddInt64(&s.EventsDropped, 1)
+}
+
 // GetEventsEmitted returns the current events emitted count
 func (s *SimpleMetricsCollector) GetEventsEmitted() int64 {
 	return atomic.LoadInt64(&s.EventsEmitted)
@@ -127,4 +140,9 @@ func (s *SimpleMetricsCollector) GetEventsEmitted() int64 {
 // GetEventsProcessed returns the current events processed count
 func (s *SimpleMetricsCollector) GetEventsProcessed() int64 {
 	return atomic.LoadInt64(&s.EventsProcessed)
+}
+
+// GetEventsDropped returns the current events dropped count
+func (s *SimpleMetricsCollector) GetEventsDropped() int64 {
+	return atomic.LoadInt64(&s.EventsDropped)
 }

@@ -61,28 +61,28 @@ type Config struct {
 
 // Stats provides emitter statistics
 type Stats struct {
-	EventsEmitted     int64
-	EventsProcessed   int64
-	ActiveListeners   int64
-	FailedEvents      int64
-	QueuedEvents      int64
-	MiddlewareErrors  int64
+	EventsEmitted    int64
+	EventsProcessed  int64
+	ActiveListeners  int64
+	FailedEvents     int64
+	QueuedEvents     int64
+	MiddlewareErrors int64
 }
 
 // emitter implements EventEmitter
 type emitter struct {
-	config       Config
-	workerpool   *workerpool.Pool
-	metrics      shared.MetricsCollector
-	validator    shared.EventValidator
-	middleware   []shared.Middleware
+	config        Config
+	workerpool    *workerpool.Pool
+	metrics       shared.MetricsCollector
+	validator     shared.EventValidator
+	middleware    []shared.Middleware
 	subscriptions map[string][]*subscription
-	subsMu       sync.RWMutex
-	closed       int64 // atomic boolean
-	eventQueue   chan eventJob
-	stats        Stats
-	stopCh       chan struct{}
-	wg           sync.WaitGroup
+	subsMu        sync.RWMutex
+	closed        int64 // atomic boolean
+	eventQueue    chan eventJob
+	stats         Stats
+	stopCh        chan struct{}
+	wg            sync.WaitGroup
 }
 
 // subscription represents an active subscription
@@ -90,13 +90,14 @@ type subscription struct {
 	*shared.BaseSubscription
 	emitter     *emitter
 	eventType   string
+	listenerID  string        // cached to avoid lock contention
 	concurrency chan struct{} // semaphore for concurrency control
 }
 
 // eventJob represents a queued event
 type eventJob struct {
-	event   shared.Event
-	subs    []*subscription
+	event    shared.Event
+	subs     []*subscription
 	resultCh chan error
 }
 
@@ -277,17 +278,19 @@ func (e *emitter) Subscribe(eventType string, listener shared.Listener) shared.S
 	defer e.subsMu.Unlock()
 
 	// Create subscription with concurrency control
+	listenerID := listener.ID()
 	sub := &subscription{
 		BaseSubscription: shared.NewBaseSubscriptionWithCallback(
-			fmt.Sprintf("%s-%s-%d", e.config.Name, listener.ID(), time.Now().UnixNano()),
+			fmt.Sprintf("%s-%s-%d", e.config.Name, listenerID, time.Now().UnixNano()),
 			eventType,
 			listener,
 			func() {
-				e.removeSubscription(eventType, listener.ID())
+				e.removeSubscription(eventType, listenerID)
 			},
 		),
 		emitter:     e,
 		eventType:   eventType,
+		listenerID:  listenerID,
 		concurrency: make(chan struct{}, e.config.MaxConcurrency),
 	}
 
@@ -332,12 +335,12 @@ func (e *emitter) Shutdown(ctx context.Context) error {
 // Stats returns emitter statistics
 func (e *emitter) Stats() Stats {
 	return Stats{
-		EventsEmitted:     atomic.LoadInt64(&e.stats.EventsEmitted),
-		EventsProcessed:   atomic.LoadInt64(&e.stats.EventsProcessed),
-		ActiveListeners:   atomic.LoadInt64(&e.stats.ActiveListeners),
-		FailedEvents:      atomic.LoadInt64(&e.stats.FailedEvents),
-		QueuedEvents:      atomic.LoadInt64(&e.stats.QueuedEvents),
-		MiddlewareErrors:  atomic.LoadInt64(&e.stats.MiddlewareErrors),
+		EventsEmitted:    atomic.LoadInt64(&e.stats.EventsEmitted),
+		EventsProcessed:  atomic.LoadInt64(&e.stats.EventsProcessed),
+		ActiveListeners:  atomic.LoadInt64(&e.stats.ActiveListeners),
+		FailedEvents:     atomic.LoadInt64(&e.stats.FailedEvents),
+		QueuedEvents:     atomic.LoadInt64(&e.stats.QueuedEvents),
+		MiddlewareErrors: atomic.LoadInt64(&e.stats.MiddlewareErrors),
 	}
 }
 
@@ -435,16 +438,16 @@ func (e *emitter) processEventForSubscription(ctx context.Context, event shared.
 // handleEventWithListener processes an event with a listener
 func (e *emitter) handleEventWithListener(ctx context.Context, event shared.Event, listener shared.Listener) error {
 	start := time.Now()
-	
+
 	err := listener.Handle(event)
-	
+
 	duration := time.Since(start)
 	e.metrics.ObserveListenerDuration(listener.ID(), duration)
 
 	if err != nil {
 		atomic.AddInt64(&e.stats.FailedEvents, 1)
 		e.metrics.IncEventsProcessed(listener.ID(), "failed")
-		
+
 		// Call error handler
 		if handlerErr := listener.OnError(event, err); handlerErr != nil {
 			return shared.NewListenerError(listener.ID(), event, handlerErr)
@@ -485,7 +488,7 @@ func (e *emitter) removeSubscription(eventType, listenerID string) {
 
 	subs := e.subscriptions[eventType]
 	for i, sub := range subs {
-		if sub.Listener().ID() == listenerID {
+		if sub.listenerID == listenerID {
 			// Remove from slice
 			e.subscriptions[eventType] = append(subs[:i], subs[i+1:]...)
 			atomic.AddInt64(&e.stats.ActiveListeners, -1)

@@ -706,7 +706,8 @@ func (b *eventBus) processEventJob(t *topic, p *partition, job eventJob) {
 			case p.eventQueue <- job:
 				atomic.AddInt64(&b.stats.QueuedEvents, 1)
 			default:
-				// Queue full, drop
+				// Retry queue full, drop retry attempt to prevent blocking
+				b.metrics.IncEventsDropped("bus", "retry_queue_full")
 			}
 		}
 	} else {
