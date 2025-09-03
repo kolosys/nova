@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -77,6 +78,7 @@ type SimpleMetricsCollector struct {
 	StoreReads        int64
 	QueueSizes        map[string]int64
 	ActiveListeners   map[string]int64
+	mu                sync.RWMutex // protects QueueSizes and ActiveListeners maps
 }
 
 // NewSimpleMetricsCollector creates a new SimpleMetricsCollector
@@ -119,11 +121,15 @@ func (s *SimpleMetricsCollector) ObserveStoreReadDuration(duration time.Duration
 
 // SetQueueSize sets current queue size
 func (s *SimpleMetricsCollector) SetQueueSize(component string, size int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.QueueSizes[component] = int64(size)
 }
 
 // SetActiveListeners sets current active listeners count
 func (s *SimpleMetricsCollector) SetActiveListeners(emitterID string, count int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ActiveListeners[emitterID] = int64(count)
 }
 

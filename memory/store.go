@@ -439,7 +439,11 @@ func (es *eventStore) Subscribe(ctx context.Context, streamID string, from Curso
 
 	// Send historical events first
 	go func() {
-		defer close(sub.ch)
+		defer func() {
+			// Mark subscription as inactive before closing channel
+			atomic.StoreInt64(&sub.active, 0)
+			close(sub.ch)
+		}()
 
 		// Read historical events
 		events, err := es.ReadStream(ctx, streamID, from.Position)
@@ -650,6 +654,11 @@ func (es *eventStore) notifySubscribers(streamID string, events []storedEvent) {
 			for _, storedEvent := range events {
 				if storedEvent.Position <= sub.cursor.Position {
 					continue
+				}
+
+				// Check if subscription is still active before sending
+				if atomic.LoadInt64(&sub.active) == 0 {
+					return
 				}
 
 				select {
