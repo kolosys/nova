@@ -157,7 +157,9 @@ type subscription struct {
 	cursor   Cursor
 	ch       chan shared.Event
 	stopCh   chan struct{}
-	active   int64 // atomic boolean
+	stopOnce sync.Once
+	active   int64          // atomic boolean
+	wg       sync.WaitGroup // tracks in-flight sends
 }
 
 // New creates a new in-memory EventStore
@@ -440,8 +442,9 @@ func (es *eventStore) Subscribe(ctx context.Context, streamID string, from Curso
 	// Send historical events first
 	go func() {
 		defer func() {
-			// Mark subscription as inactive before closing channel
-			atomic.StoreInt64(&sub.active, 0)
+			// Wait for all in-flight sends to complete
+			sub.wg.Wait()
+			// Now safe to close the channel
 			close(sub.ch)
 		}()
 
@@ -572,7 +575,9 @@ func (es *eventStore) Close() error {
 	// Close all active subscriptions
 	es.subscmu.Lock()
 	for _, sub := range es.subscriptions {
-		close(sub.stopCh)
+		sub.stopOnce.Do(func() {
+			close(sub.stopCh)
+		})
 	}
 	es.subscmu.Unlock()
 
@@ -649,8 +654,13 @@ func (es *eventStore) notifySubscribers(streamID string, events []storedEvent) {
 			continue
 		}
 
+		// Track this goroutine
+		sub.wg.Add(1)
+
 		// Send events to subscriber
 		go func(sub *subscription, events []storedEvent) {
+			defer sub.wg.Done()
+
 			for _, storedEvent := range events {
 				if storedEvent.Position <= sub.cursor.Position {
 					continue
@@ -678,12 +688,20 @@ func (es *eventStore) notifySubscribers(streamID string, events []storedEvent) {
 
 func (es *eventStore) unsubscribe(subscriptionID string) {
 	es.subscmu.Lock()
-	defer es.subscmu.Unlock()
-
-	if sub, exists := es.subscriptions[subscriptionID]; exists {
-		atomic.StoreInt64(&sub.active, 0)
+	sub, exists := es.subscriptions[subscriptionID]
+	if exists {
+		// Remove from map first - this prevents notifySubscribers from seeing it
 		delete(es.subscriptions, subscriptionID)
 		atomic.AddInt64(&es.stats.SubscriptionsActive, -1)
+	}
+	es.subscmu.Unlock()
+
+	if exists {
+		// Signal the subscription goroutine to stop (closes stopCh exactly once)
+		sub.stopOnce.Do(func() {
+			atomic.StoreInt64(&sub.active, 0)
+			close(sub.stopCh)
+		})
 	}
 }
 
