@@ -6,13 +6,12 @@
 
 **Import Path:** `github.com/kolosys/nova/bus`
 
-
-
 ## Architecture Overview
 
 <!-- Add information about the package architecture here -->
 
 This section should explain:
+
 - The main design patterns used in this package
 - How components interact with each other
 - The data flow through the package
@@ -35,6 +34,7 @@ Explain the second core concept here.
 <!-- Explain important design decisions and trade-offs -->
 
 Document why certain approaches were chosen:
+
 - Performance considerations
 - API design choices
 - Backward compatibility decisions
@@ -67,6 +67,7 @@ Document why certain approaches were chosen:
 <!-- How this package integrates with other packages or systems -->
 
 Explain how this package works with:
+
 - Other packages in this library
 - External dependencies
 - Common frameworks or tools
@@ -79,5 +80,4 @@ Explain how this package works with:
 
 ---
 
-*This documentation should be updated by package maintainers to reflect the actual architecture and design patterns used.*
-
+_This documentation should be updated by package maintainers to reflect the actual architecture and design patterns used._
