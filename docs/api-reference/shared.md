@@ -16,7 +16,7 @@ Common error types for Nova event system
 
 
 ```go
-&{0xc00048a2b8 [ErrEventNotFound] <nil> [0xc0005981c0] <nil>}&{0xc00048a300 [ErrInvalidEvent] <nil> [0xc000598200] <nil>}&{0xc00048a348 [ErrListenerNotFound] <nil> [0xc000598240] <nil>}&{0xc00048a390 [ErrTopicNotFound] <nil> [0xc000598300] <nil>}&{0xc00048a3d8 [ErrSubscriptionNotFound] <nil> [0xc000598340] <nil>}&{0xc00048a420 [ErrEmitterClosed] <nil> [0xc000598380] <nil>}&{0xc00048a468 [ErrBusClosed] <nil> [0xc0005983c0] <nil>}&{0xc00048a4b0 [ErrStoreReadOnly] <nil> [0xc000598400] <nil>}&{0xc00048a4f8 [ErrBufferFull] <nil> [0xc000598440] <nil>}&{0xc00048a540 [ErrRetryLimitExceeded] <nil> [0xc000598480] <nil>}&{0xc00048a588 [ErrTimeout] <nil> [0xc0005984c0] <nil>}
+&{0xc000580138 [ErrEventNotFound] <nil> [0xc00007c740] <nil>}&{0xc000580180 [ErrInvalidEvent] <nil> [0xc00007c780] <nil>}&{0xc0005801c8 [ErrListenerNotFound] <nil> [0xc00007c7c0] <nil>}&{0xc000580210 [ErrTopicNotFound] <nil> [0xc00007c880] <nil>}&{0xc000580258 [ErrSubscriptionNotFound] <nil> [0xc00007c8c0] <nil>}&{0xc0005802a0 [ErrEmitterClosed] <nil> [0xc00007c900] <nil>}&{0xc0005802e8 [ErrBusClosed] <nil> [0xc00007c940] <nil>}&{0xc000580330 [ErrStoreReadOnly] <nil> [0xc00007c980] <nil>}&{0xc000580378 [ErrBufferFull] <nil> [0xc00007c9c0] <nil>}&{0xc0005803c0 [ErrRetryLimitExceeded] <nil> [0xc00007ca00] <nil>}&{0xc000580408 [ErrTimeout] <nil> [0xc00007ca40] <nil>}
 ```
 
 ### DefaultEventValidator
@@ -25,7 +25,7 @@ DefaultEventValidator provides basic event validation
 
 
 ```go
-&{<nil> [DefaultEventValidator] <nil> [0xc0001c4b40] <nil>}
+&{<nil> [DefaultEventValidator] <nil> [0xc0004c7f40] <nil>}
 ```
 
 ## Types
@@ -291,7 +291,7 @@ func (*BaseListener) Handle(event Event) error
 ID returns the listener ID
 
 ```go
-func (*BaseListener) ID() string
+func (*BaseEvent) ID() string
 ```
 
 **Parameters:**
