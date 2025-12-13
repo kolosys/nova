@@ -1,0 +1,44 @@
+repository:
+    name: nova
+    owner: kolosys
+    description: '**Production-ready event systems and messaging for Go, built on Ion''s concurrency primitives.**'
+    import_path: github.com/kolosys/nova
+    branch: main
+    url: https://github.com/kolosys/nova
+output:
+    directory: /home/runner/work/nova/nova/docs
+    clean: true
+    preserve_custom: false
+discovery:
+    packages:
+        auto_discover: true
+        include_patterns:
+            - ./...
+        exclude_patterns:
+            - ./vendor/...
+            - ./test/...
+            - ./.git/...
+            - '**/*_test.go'
+        manual_packages: []
+    api_generation:
+        enabled: true
+        include_unexported: false
+        include_tests: false
+        include_examples: true
+    examples:
+        enabled: true
+        auto_discover: true
+        directories: []
+templates:
+    directory: ""
+    custom_templates: []
+metadata:
+    version: latest
+    go_version: ""
+    author: ""
+    license: MIT
+generation:
+    date_format: "2006-01-02"
+    include_generated_notice: true
+    include_toc: true
+    max_depth: 3

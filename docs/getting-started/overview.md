@@ -1,0 +1,61 @@
+# Overview
+
+**Production-ready event systems and messaging for Go, built on Ion's concurrency primitives.**
+
+## About nova
+
+This documentation provides comprehensive guidance for using nova, a Go library designed to help you build better software.
+
+## Project Information
+
+- **Repository**: [https://github.com/kolosys/nova](https://github.com/kolosys/nova)
+- **Import Path**: `github.com/kolosys/nova`
+- **License**: MIT
+- **Version**: latest
+
+## What You'll Find Here
+
+This documentation is organized into several sections to help you find what you need:
+
+- **[Getting Started](../getting-started/)** - Installation instructions and quick start guides
+- **[Core Concepts](../core-concepts/)** - Fundamental concepts and architecture details
+- **[Advanced Topics](../advanced/)** - Performance tuning and advanced usage patterns
+- **[API Reference](../api-reference/)** - Complete API reference documentation
+- **[Examples](../examples/)** - Working code examples and tutorials
+
+## Project Features
+
+nova provides:
+- **bus** - 
+- **emitter** - 
+- **main** - 
+- **listener** - 
+- **memory** - 
+- **shared** - 
+
+## Quick Links
+
+- [Installation Guide](installation.md)
+- [Quick Start Guide](quick-start.md)
+- [API Reference](../api-reference/)
+- [Examples](../examples/README.md)
+
+## Community & Support
+
+- **GitHub Issues**: [https://github.com/kolosys/nova/issues](https://github.com/kolosys/nova/issues)
+- **Discussions**: [https://github.com/kolosys/nova/discussions](https://github.com/kolosys/nova/discussions)
+- **Repository Owner**: [kolosys](https://github.com/kolosys)
+
+## Getting Help
+
+If you encounter any issues or have questions:
+
+1. Check the [API Reference](../api-reference/) for detailed documentation
+2. Browse the [Examples](../examples/README.md) for common use cases
+3. Search existing [GitHub Issues](https://github.com/kolosys/nova/issues)
+4. Open a new issue if you've found a bug or have a feature request
+
+## Next Steps
+
+Ready to get started? Head over to the [Installation Guide](installation.md) to begin using nova.
+
