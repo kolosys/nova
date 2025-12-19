@@ -1,307 +1,333 @@
 # Quick Start
 
-This guide will help you get started with nova quickly with a basic example.
+Build a working event system in minutes. This guide covers the essential patterns for using Nova.
 
-## Basic Usage
+## Basic Event Emission
 
-Here's a simple example to get you started:
+The simplest way to use Nova is with the Emitter for direct event handling:
 
 ```go
 package main
 
 import (
+    "context"
     "fmt"
     "log"
-    "github.com/kolosys/nova/bus"
+
+    "github.com/kolosys/ion/workerpool"
     "github.com/kolosys/nova/emitter"
+    "github.com/kolosys/nova/shared"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Create an Ion workerpool (required by all Nova components)
+    pool := workerpool.New(4, 100)
+    defer pool.Close(ctx)
+
+    // Create the emitter
+    em := emitter.New(emitter.Config{
+        WorkerPool: pool,
+        BufferSize: 1000,
+    })
+    defer em.Shutdown(ctx)
+
+    // Create a listener
+    listener := shared.NewBaseListener("user-handler", func(event shared.Event) error {
+        data := event.Data().(map[string]any)
+        fmt.Printf("User created: %s (%s)\n", data["name"], event.ID())
+        return nil
+    })
+
+    // Subscribe to events
+    em.Subscribe("user.created", listener)
+
+    // Create and emit an event
+    event := shared.NewBaseEvent("user-123", "user.created", map[string]any{
+        "name":  "Alice",
+        "email": "alice@example.com",
+    })
+
+    if err := em.Emit(ctx, event); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+## Async Event Processing
+
+For non-blocking event emission, use `EmitAsync`:
+
+```go
+// Configure for async mode
+em := emitter.New(emitter.Config{
+    WorkerPool: pool,
+    AsyncMode:  true,
+    BufferSize: 1000,
+})
+
+// Events are queued and processed in the background
+if err := em.EmitAsync(ctx, event); err != nil {
+    log.Printf("Failed to queue event: %v", err)
+}
+
+// Batch emit multiple events
+events := []shared.Event{event1, event2, event3}
+if err := em.EmitBatch(ctx, events); err != nil {
+    log.Printf("Batch failed: %v", err)
+}
+```
+
+## Topic-Based Routing with Bus
+
+The EventBus provides topic-based routing with partitioning and delivery guarantees:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+
+    "github.com/kolosys/ion/workerpool"
+    "github.com/kolosys/nova/bus"
+    "github.com/kolosys/nova/shared"
+)
+
+func main() {
+    ctx := context.Background()
+
+    pool := workerpool.New(4, 100)
+    defer pool.Close(ctx)
+
+    // Create the event bus
+    b := bus.New(bus.Config{
+        WorkerPool:          pool,
+        DefaultPartitions:   4,
+        DefaultDeliveryMode: bus.AtLeastOnce,
+    })
+    defer b.Shutdown(ctx)
+
+    // Create a topic with specific configuration
+    b.CreateTopic("orders", bus.TopicConfig{
+        BufferSize:   2000,
+        Partitions:   8,
+        DeliveryMode: bus.ExactlyOnce,
+        Retention:    24 * time.Hour,
+        OrderingKey:  func(e shared.Event) string {
+            return e.Metadata()["customer_id"]
+        },
+    })
+
+    // Subscribe to topics
+    orderHandler := shared.NewBaseListener("order-processor", func(event shared.Event) error {
+        fmt.Printf("Processing order: %s\n", event.ID())
+        return nil
+    })
+    b.Subscribe("orders", orderHandler)
+
+    // Pattern-based subscription (regex)
+    auditHandler := shared.NewBaseListener("audit-logger", func(event shared.Event) error {
+        fmt.Printf("Audit: %s on %s\n", event.Type(), event.ID())
+        return nil
+    })
+    b.SubscribePattern("order\\..*", auditHandler)
+
+    // Publish events
+    event := shared.NewBaseEventWithMetadata(
+        "order-456",
+        "order.created",
+        map[string]any{"total": 99.99},
+        map[string]string{"customer_id": "cust-789"},
+    )
+
+    if err := b.Publish(ctx, "orders", event); err != nil {
+        fmt.Printf("Publish failed: %v\n", err)
+    }
+}
+```
+
+## Resilient Listeners
+
+The ListenerManager adds retry policies, circuit breakers, and dead letter queues:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+
+    "github.com/kolosys/ion/workerpool"
     "github.com/kolosys/nova/listener"
+    "github.com/kolosys/nova/shared"
+)
+
+func main() {
+    ctx := context.Background()
+
+    pool := workerpool.New(4, 100)
+    defer pool.Close(ctx)
+
+    // Create the listener manager
+    lm := listener.New(listener.Config{WorkerPool: pool})
+    defer lm.Stop(ctx)
+
+    // Create a listener
+    handler := shared.NewBaseListener("payment-processor", func(event shared.Event) error {
+        // Process payment...
+        return nil
+    })
+
+    // Register with resilience configuration
+    lm.Register(handler, listener.ListenerConfig{
+        Concurrency: 10,
+        Timeout:     30 * time.Second,
+        RetryPolicy: listener.RetryPolicy{
+            MaxAttempts:  3,
+            InitialDelay: 100 * time.Millisecond,
+            MaxDelay:     30 * time.Second,
+            Backoff:      listener.ExponentialBackoff,
+        },
+        Circuit: listener.CircuitConfig{
+            Enabled:          true,
+            FailureThreshold: 5,
+            SuccessThreshold: 3,
+            Timeout:          30 * time.Second,
+        },
+        DeadLetter: listener.DeadLetterConfig{
+            Enabled: true,
+            Handler: func(event shared.Event, err error) {
+                fmt.Printf("Dead letter: %s - %v\n", event.ID(), err)
+            },
+        },
+    })
+
+    // Start processing
+    lm.Start(ctx)
+
+    // Check health
+    fmt.Printf("Health: %s\n", lm.Health())
+}
+```
+
+## Event Store with Replay
+
+The memory store enables event persistence, replay, and live subscriptions:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+
     "github.com/kolosys/nova/memory"
     "github.com/kolosys/nova/shared"
 )
 
 func main() {
-    // Basic usage example
-    fmt.Println("Welcome to nova!")
-    
-    // TODO: Add your code here
+    ctx := context.Background()
+
+    // Create the event store
+    store := memory.New(memory.Config{
+        MaxEventsPerStream: 100000,
+        RetentionDuration:  24 * time.Hour,
+    })
+    defer store.Close()
+
+    // Append events to a stream
+    events := []shared.Event{
+        shared.NewBaseEvent("evt-1", "user.created", map[string]any{"name": "Alice"}),
+        shared.NewBaseEvent("evt-2", "user.updated", map[string]any{"name": "Alice Smith"}),
+    }
+    store.Append(ctx, "user-stream", events...)
+
+    // Read events from a stream
+    cursor := memory.Cursor{StreamID: "user-stream", Position: 0}
+    readEvents, newCursor, _ := store.Read(ctx, "user-stream", cursor, 100)
+    fmt.Printf("Read %d events, cursor at position %d\n", len(readEvents), newCursor.Position)
+
+    // Replay historical events
+    from := time.Now().Add(-1 * time.Hour)
+    to := time.Now()
+    replayCh, _ := store.Replay(ctx, from, to)
+    for event := range replayCh {
+        fmt.Printf("Replayed: %s\n", event.ID())
+    }
+
+    // Subscribe to live events
+    liveCh, _ := store.Subscribe(ctx, "user-stream", cursor)
+    go func() {
+        for event := range liveCh {
+            fmt.Printf("Live event: %s\n", event.ID())
+        }
+    }()
 }
 ```
 
-## Common Use Cases
+## Adding Middleware
 
-### Using bus
-
-**Import Path:** `github.com/kolosys/nova/bus`
-
-
+The Emitter supports middleware for cross-cutting concerns:
 
 ```go
-package main
-
-import (
-    "fmt"
-    "github.com/kolosys/nova/bus"
-)
-
-func main() {
-    // Example usage of bus
-    fmt.Println("Using bus package")
+// Create logging middleware
+loggingMiddleware := shared.MiddlewareFunc{
+    BeforeFunc: func(event shared.Event) error {
+        fmt.Printf("[LOG] Processing event: %s (%s)\n", event.ID(), event.Type())
+        return nil
+    },
+    AfterFunc: func(event shared.Event, err error) error {
+        if err != nil {
+            fmt.Printf("[LOG] Event %s failed: %v\n", event.ID(), err)
+        } else {
+            fmt.Printf("[LOG] Event %s completed\n", event.ID())
+        }
+        return nil
+    },
 }
+
+em.Middleware(loggingMiddleware)
 ```
 
-#### Available Types
-- **Config** - Config configures the EventBus
-- **DeliveryMode** - DeliveryMode defines the delivery guarantees for events
-- **EventBus** - EventBus defines the interface for topic-based event routing
-- **Stats** - Stats provides bus statistics
-- **TopicConfig** - TopicConfig configures a topic
+## Graceful Shutdown
 
-For detailed API documentation, see the [bus API Reference](../api-reference/bus.md).
-
-### Using emitter
-
-**Import Path:** `github.com/kolosys/nova/emitter`
-
-
+Always shut down components gracefully:
 
 ```go
-package main
+// Create a context with timeout for shutdown
+shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
 
-import (
-    "fmt"
-    "github.com/kolosys/nova/emitter"
-)
-
-func main() {
-    // Example usage of emitter
-    fmt.Println("Using emitter package")
+// Shutdown in reverse order of creation
+if err := em.Shutdown(shutdownCtx); err != nil {
+    log.Printf("Emitter shutdown error: %v", err)
 }
-```
 
-#### Available Types
-- **Config** - Config configures the EventEmitter
-- **EventEmitter** - EventEmitter defines the interface for event emission and subscription
-- **Stats** - Stats provides emitter statistics
-
-For detailed API documentation, see the [emitter API Reference](../api-reference/emitter.md).
-
-### Using listener
-
-**Import Path:** `github.com/kolosys/nova/listener`
-
-
-
-```go
-package main
-
-import (
-    "fmt"
-    "github.com/kolosys/nova/listener"
-)
-
-func main() {
-    // Example usage of listener
-    fmt.Println("Using listener package")
+if err := b.Shutdown(shutdownCtx); err != nil {
+    log.Printf("Bus shutdown error: %v", err)
 }
-```
 
-#### Available Types
-- **BackoffStrategy** - BackoffStrategy defines different backoff strategies for retries
-- **CircuitConfig** - CircuitConfig configures circuit breaker behavior
-- **Config** - Config configures the ListenerManager
-- **DeadLetterConfig** - DeadLetterConfig configures dead letter queue behavior
-- **HealthStatus** - HealthStatus represents listener health
-- **ListenerConfig** - ListenerConfig configures listener behavior
-- **ListenerManager** - ListenerManager defines the interface for managing event listeners
-- **RetryPolicy** - RetryPolicy defines retry behavior for failed events
-- **Stats** - Stats provides listener manager statistics
-
-For detailed API documentation, see the [listener API Reference](../api-reference/listener.md).
-
-### Using memory
-
-**Import Path:** `github.com/kolosys/nova/memory`
-
-
-
-```go
-package main
-
-import (
-    "fmt"
-    "github.com/kolosys/nova/memory"
-)
-
-func main() {
-    // Example usage of memory
-    fmt.Println("Using memory package")
+if err := lm.Stop(shutdownCtx); err != nil {
+    log.Printf("Listener manager shutdown error: %v", err)
 }
-```
 
-#### Available Types
-- **Config** - Config configures the EventStore
-- **Cursor** - Cursor represents a position in the event stream
-- **EventStore** - EventStore defines the interface for event storage and replay
-- **Stats** - Stats provides store statistics
-- **StreamInfo** - StreamInfo provides information about a stream
-
-For detailed API documentation, see the [memory API Reference](../api-reference/memory.md).
-
-### Using shared
-
-**Import Path:** `github.com/kolosys/nova/shared`
-
-
-
-```go
-package main
-
-import (
-    "fmt"
-    "github.com/kolosys/nova/shared"
-)
-
-func main() {
-    // Example usage of shared
-    fmt.Println("Using shared package")
+if err := store.Close(); err != nil {
+    log.Printf("Store close error: %v", err)
 }
-```
 
-#### Available Types
-- **BaseEvent** - BaseEvent provides a default implementation of the Event interface
-- **BaseListener** - BaseListener provides a basic implementation of Listener
-- **BaseSubscription** - BaseSubscription provides a default implementation of Subscription
-- **Event** - Event represents a domain event in the Nova system
-- **EventError** - EventError wraps an error with event context
-- **EventValidator** - EventValidator validates events before processing
-- **EventValidatorFunc** - EventValidatorFunc is a function adapter for EventValidator
-- **Listener** - Listener represents an event listener
-- **ListenerError** - ListenerError wraps an error with listener context
-- **MetricsCollector** - MetricsCollector defines the interface for collecting Nova metrics
-- **Middleware** - Middleware provides hooks for cross-cutting concerns
-- **MiddlewareFunc** - MiddlewareFunc is a function adapter for Middleware
-- **NoOpMetricsCollector** - NoOpMetricsCollector provides a no-op implementation for when metrics are disabled
-- **SimpleMetricsCollector** - SimpleMetricsCollector provides a basic in-memory metrics collector for testing
-- **Subscription** - Subscription represents an active subscription to events
-- **ValidationError** - ValidationError indicates a validation failure
-
-For detailed API documentation, see the [shared API Reference](../api-reference/shared.md).
-
-## Step-by-Step Tutorial
-
-### Step 1: Import the Package
-
-First, import the necessary packages in your Go file:
-
-```go
-import (
-    "fmt"
-    "github.com/kolosys/nova/bus"
-    "github.com/kolosys/nova/emitter"
-    "github.com/kolosys/nova/listener"
-    "github.com/kolosys/nova/memory"
-    "github.com/kolosys/nova/shared"
-)
-```
-
-### Step 2: Initialize
-
-Set up the basic configuration:
-
-```go
-func main() {
-    // Initialize your application
-    fmt.Println("Initializing nova...")
-}
-```
-
-### Step 3: Use the Library
-
-Implement your specific use case:
-
-```go
-func main() {
-    // Your implementation here
-}
-```
-
-## Running Your Code
-
-To run your Go program:
-
-```bash
-go run main.go
-```
-
-To build an executable:
-
-```bash
-go build -o myapp
-./myapp
-```
-
-## Configuration Options
-
-nova can be configured to suit your needs. Check the [Core Concepts](../core-concepts/) section for detailed information about configuration options.
-
-## Error Handling
-
-Always handle errors appropriately:
-
-```go
-result, err := someFunction()
-if err != nil {
-    log.Fatalf("Error: %v", err)
-}
-```
-
-## Best Practices
-
-- Always handle errors returned by library functions
-- Check the API documentation for detailed parameter information
-- Use meaningful variable and function names
-- Add comments to document your code
-
-## Complete Example
-
-Here's a complete working example:
-
-```go
-package main
-
-import (
-    "fmt"
-    "log"
-    "github.com/kolosys/nova/bus"
-    "github.com/kolosys/nova/emitter"
-    "github.com/kolosys/nova/listener"
-    "github.com/kolosys/nova/memory"
-    "github.com/kolosys/nova/shared"
-)
-
-func main() {
-    fmt.Println("Starting nova application...")
-    
-    // Add your implementation here
-    
-    fmt.Println("Application completed successfully!")
-}
+pool.Close(shutdownCtx)
 ```
 
 ## Next Steps
 
-Now that you've seen the basics, explore:
-
-- **[Core Concepts](../core-concepts/)** - Understanding the library architecture
-- **[API Reference](../api-reference/)** - Complete API documentation
-- **[Examples](../examples/README.md)** - More detailed examples
-- **[Advanced Topics](../advanced/)** - Performance tuning and advanced patterns
-
-## Getting Help
-
-If you run into issues:
-
-1. Check the [API Reference](../api-reference/)
-2. Browse the [Examples](../examples/README.md)
-3. Visit the [GitHub Issues](https://github.com/kolosys/nova/issues) page
-
+- [Core Concepts](../core-concepts/shared.md) — understand the fundamental types
+- [Emitter](../core-concepts/emitter.md) — deep dive into event emission
+- [Bus](../core-concepts/bus.md) — topic-based routing details
+- [Listener](../core-concepts/listener.md) — resilience patterns
+- [Memory Store](../core-concepts/memory.md) — event storage and replay
+- [Best Practices](../advanced/best-practices.md) — production recommendations

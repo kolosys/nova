@@ -1,61 +1,104 @@
 # Overview
 
-**Production-ready event systems and messaging for Go, built on Ion's concurrency primitives.**
+Nova is an enterprise-grade event processing library for Go that delivers predictable performance, robust delivery guarantees, and comprehensive observability. Built as a companion to [Ion](https://github.com/kolosys/ion), it leverages proven concurrency primitives for reliable, high-performance event systems.
 
-## About nova
+## Why Nova?
 
-This documentation provides comprehensive guidance for using nova, a Go library designed to help you build better software.
+Modern distributed systems require sophisticated event handling with guarantees that basic channels cannot provide. Nova bridges this gap by offering:
 
-## Project Information
+- **Production-ready semantics** — at-most-once, at-least-once, and exactly-once delivery modes
+- **Resilience patterns** — circuit breakers, retry policies, and dead letter queues
+- **Zero external dependencies** — no message brokers or heavyweight frameworks required
+- **Context-aware APIs** — full support for cancellation and timeouts
 
-- **Repository**: [https://github.com/kolosys/nova](https://github.com/kolosys/nova)
-- **Import Path**: `github.com/kolosys/nova`
-- **License**: MIT
-- **Version**: latest
+## Core Components
 
-## What You'll Find Here
+Nova provides four main packages that work independently or together:
 
-This documentation is organized into several sections to help you find what you need:
+| Package      | Purpose                                                         |
+| ------------ | --------------------------------------------------------------- |
+| **emitter**  | Direct event emission with sync/async processing and middleware |
+| **bus**      | Topic-based routing with pattern matching and partitioning      |
+| **listener** | Lifecycle management with retries, circuits, and dead letters   |
+| **memory**   | In-memory event store with replay and live subscriptions        |
 
-- **[Getting Started](../getting-started/)** - Installation instructions and quick start guides
-- **[Core Concepts](../core-concepts/)** - Fundamental concepts and architecture details
-- **[Advanced Topics](../advanced/)** - Performance tuning and advanced usage patterns
-- **[API Reference](../api-reference/)** - Complete API reference documentation
-- **[Examples](../examples/)** - Working code examples and tutorials
+All components share common types from the **shared** package.
 
-## Project Features
+## Architecture
 
-nova provides:
-- **bus** - 
-- **emitter** - 
-- **main** - 
-- **listener** - 
-- **memory** - 
-- **shared** - 
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Application   │    │   Application   │    │   Application   │
+└────────┬────────┘    └────────┬────────┘    └────────┬────────┘
+         │                      │                      │
+         ▼                      ▼                      ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│     Emitter     │    │      Bus        │    │  Listener Mgr   │
+│  • Sync/Async   │    │  • Topics       │    │  • Retries      │
+│  • Middleware   │    │  • Patterns     │    │  • Circuits     │
+│  • Concurrency  │    │  • Partitions   │    │  • Dead Letter  │
+└────────┬────────┘    └────────┬────────┘    └────────┬────────┘
+         │                      │                      │
+         └──────────────────────┼──────────────────────┘
+                                │
+                                ▼
+                   ┌─────────────────────┐
+                   │    Event Store      │
+                   │  • Streams          │
+                   │  • Replay           │
+                   │  • Subscriptions    │
+                   └────────┬────────────┘
+                            │
+                            ▼
+                   ┌─────────────────────┐
+                   │  Ion WorkerPool     │
+                   │  • Concurrency      │
+                   │  • Load Balancing   │
+                   └─────────────────────┘
+```
 
-## Quick Links
+## Key Features
 
-- [Installation Guide](installation.md)
-- [Quick Start Guide](quick-start.md)
-- [API Reference](../api-reference/)
-- [Examples](../examples/README.md)
+### Delivery Guarantees
 
-## Community & Support
+Nova supports three delivery modes to match your requirements:
 
-- **GitHub Issues**: [https://github.com/kolosys/nova/issues](https://github.com/kolosys/nova/issues)
-- **Discussions**: [https://github.com/kolosys/nova/discussions](https://github.com/kolosys/nova/discussions)
-- **Repository Owner**: [kolosys](https://github.com/kolosys)
+- **AtMostOnce** — fire-and-forget for maximum throughput
+- **AtLeastOnce** — guaranteed delivery with possible duplicates (default)
+- **ExactlyOnce** — guaranteed delivery without duplicates
 
-## Getting Help
+### Resilience
 
-If you encounter any issues or have questions:
+Built-in fault tolerance patterns protect your system:
 
-1. Check the [API Reference](../api-reference/) for detailed documentation
-2. Browse the [Examples](../examples/README.md) for common use cases
-3. Search existing [GitHub Issues](https://github.com/kolosys/nova/issues)
-4. Open a new issue if you've found a bug or have a feature request
+- **Retry Policies** — configurable backoff strategies (fixed, linear, exponential)
+- **Circuit Breakers** — prevent cascade failures with automatic recovery
+- **Dead Letter Queues** — capture failed events for later processing
 
-## Next Steps
+### Observability
 
-Ready to get started? Head over to the [Installation Guide](installation.md) to begin using nova.
+Comprehensive metrics and health monitoring:
 
+- Events emitted, processed, dropped, and failed
+- Listener processing durations
+- Queue sizes and active subscriptions
+- Health status (healthy, degraded, unhealthy, circuit-open)
+
+## Requirements
+
+- Go 1.24 or later
+- [github.com/kolosys/ion](https://github.com/kolosys/ion) — provides the workerpool
+
+## Getting Started
+
+Ready to use Nova? Continue to:
+
+1. [Installation](installation.md) — add Nova to your project
+2. [Quick Start](quick-start.md) — build your first event system
+3. [Core Concepts](../core-concepts/shared.md) — understand the fundamentals
+
+## Links
+
+- **Repository**: [github.com/kolosys/nova](https://github.com/kolosys/nova)
+- **Ion Library**: [github.com/kolosys/ion](https://github.com/kolosys/ion)
+- **Issues**: [github.com/kolosys/nova/issues](https://github.com/kolosys/nova/issues)

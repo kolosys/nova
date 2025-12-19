@@ -1,165 +1,133 @@
 # Installation
 
-This guide will help you install and set up nova in your Go project.
+This guide covers installing Nova and its dependencies.
 
 ## Prerequisites
 
-Before installing nova, ensure you have:
+- **Go 1.24** or later
+- A Go module initialized in your project
 
-- **Go ** or later installed
-- A Go module initialized in your project (run `go mod init` if needed)
-- Access to the GitHub repository (for private repositories)
-
-## Installation Steps
-
-### Step 1: Install the Package
-
-Use `go get` to install nova:
+## Install Nova
 
 ```bash
-go get github.com/kolosys/nova
+go get github.com/kolosys/nova@latest
 ```
 
-This will download the package and add it to your `go.mod` file.
+Nova requires [Ion](https://github.com/kolosys/ion) for its workerpool. This dependency is automatically installed.
 
-### Step 2: Import in Your Code
+## Import Packages
 
-Import the package in your Go source files:
+Nova is organized into focused packages. Import only what you need:
 
 ```go
-import "github.com/kolosys/nova"
+import (
+    "github.com/kolosys/nova/emitter"  // Direct event emission
+    "github.com/kolosys/nova/bus"      // Topic-based routing
+    "github.com/kolosys/nova/listener" // Lifecycle management
+    "github.com/kolosys/nova/memory"   // In-memory event store
+    "github.com/kolosys/nova/shared"   // Core types and interfaces
+)
 ```
 
-### Multiple Packages
-
-nova includes several packages. Import the ones you need:
+You'll also need Ion's workerpool:
 
 ```go
-// 
-import "github.com/kolosys/nova/bus"
+import "github.com/kolosys/ion/workerpool"
 ```
 
-```go
-// 
-import "github.com/kolosys/nova/emitter"
-```
+## Verify Installation
 
-```go
-// 
-import "github.com/kolosys/nova/listener"
-```
-
-```go
-// 
-import "github.com/kolosys/nova/memory"
-```
-
-```go
-// 
-import "github.com/kolosys/nova/shared"
-```
-
-### Step 3: Verify Installation
-
-Create a simple test file to verify the installation:
+Create a simple test to verify everything works:
 
 ```go
 package main
 
 import (
+    "context"
     "fmt"
-    "github.com/kolosys/nova"
+
+    "github.com/kolosys/ion/workerpool"
+    "github.com/kolosys/nova/emitter"
+    "github.com/kolosys/nova/shared"
 )
 
 func main() {
-    fmt.Println("nova installed successfully!")
+    pool := workerpool.New(4, 100)
+    defer pool.Close(context.Background())
+
+    em := emitter.New(emitter.Config{WorkerPool: pool})
+    defer em.Shutdown(context.Background())
+
+    fmt.Println("Nova installed successfully!")
+    fmt.Printf("Emitter stats: %+v\n", em.Stats())
 }
 ```
 
-Run the test:
+Run it:
 
 ```bash
 go run main.go
 ```
 
-## Updating the Package
+## Version Pinning
 
-To update to the latest version:
-
-```bash
-go get -u github.com/kolosys/nova
-```
-
-To update to a specific version:
+Install a specific version:
 
 ```bash
-go get github.com/kolosys/nova@v1.2.3
+go get github.com/kolosys/nova@v0.1.0
 ```
 
-## Installing a Specific Version
+## Updating
 
-To install a specific version of the package:
+Update to the latest version:
 
 ```bash
-go get github.com/kolosys/nova@v1.0.0
+go get -u github.com/kolosys/nova@latest
 ```
-
-Check available versions on the [GitHub releases page](https://github.com/kolosys/nova/releases).
 
 ## Development Setup
 
-If you want to contribute or modify the library:
-
-### Clone the Repository
+To contribute or modify Nova:
 
 ```bash
 git clone https://github.com/kolosys/nova.git
 cd nova
-```
-
-### Install Dependencies
-
-```bash
 go mod download
-```
-
-### Run Tests
-
-```bash
-go test ./...
+go test -race ./...
 ```
 
 ## Troubleshooting
 
 ### Module Not Found
 
-If you encounter a "module not found" error:
+Ensure your Go environment is configured correctly:
 
-1. Ensure your `GOPATH` is set correctly
-2. Check that you have network access to GitHub
-3. Try running `go clean -modcache` and reinstall
+```bash
+go env GOPATH
+go env GOPROXY
+```
+
+Try clearing the module cache:
+
+```bash
+go clean -modcache
+go get github.com/kolosys/nova@latest
+```
 
 ### Private Repository Access
 
-For private repositories, configure Git to use SSH or a personal access token:
+For private repositories, configure Git authentication:
 
 ```bash
 git config --global url."git@github.com:".insteadOf "https://github.com/"
 ```
 
-Or set up GOPRIVATE:
+Or set GOPRIVATE:
 
 ```bash
-export GOPRIVATE=github.com/kolosys/nova
+export GOPRIVATE=github.com/kolosys/*
 ```
 
 ## Next Steps
 
-Now that you have nova installed, check out the [Quick Start Guide](quick-start.md) to learn how to use it.
-
-## Additional Resources
-
-- [Quick Start Guide](quick-start.md)
-- [API Reference](../api-reference/)
-- [Examples](../examples/README.md)
-
+Continue to the [Quick Start](quick-start.md) guide to build your first event system.
