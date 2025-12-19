@@ -8,11 +8,6 @@
 
 **Production-ready event systems and messaging for Go, built on Ion's concurrency primitives.**
 
-[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
-[![Build Status](https://img.shields.io/badge/build-passing-green.svg)](#)
-[![Test Coverage](https://img.shields.io/badge/coverage-90%25+-brightgreen.svg)](#)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
 Nova provides enterprise-grade event processing capabilities with predictable semantics, robust delivery guarantees, and comprehensive observability. Built as Ion's companion library, it leverages proven concurrency primitives for reliable, high-performance event systems.
 
 ## ✨ Features
