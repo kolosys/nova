@@ -155,7 +155,7 @@ func (*BaseEvent) GetMetadata(key string) (string, bool)
 ID returns the event ID
 
 ```go
-func (*BaseListener) ID() string
+func (*BaseEvent) ID() string
 ```
 
 **Parameters:**
