@@ -10,22 +10,57 @@ Complete API documentation for the shared package.
 
 ## Variables
 
-### ErrEventNotFound, ErrInvalidEvent, ErrListenerNotFound, ErrTopicNotFound, ErrSubscriptionNotFound, ErrEmitterClosed, ErrBusClosed, ErrStoreReadOnly, ErrBufferFull, ErrRetryLimitExceeded, ErrTimeout
+**ErrEventNotFound, ErrInvalidEvent, ErrListenerNotFound, ErrTopicNotFound, ErrSubscriptionNotFound, ErrEmitterClosed, ErrBusClosed, ErrStoreReadOnly, ErrBufferFull, ErrRetryLimitExceeded, ErrTimeout**
 
 Common error types for Nova event system
 
 
 ```go
-&{0xc00011e120 [ErrEventNotFound] <nil> [0xc000498900] <nil>}&{0xc00011e168 [ErrInvalidEvent] <nil> [0xc000498940] <nil>}&{0xc00011e1b0 [ErrListenerNotFound] <nil> [0xc000498980] <nil>}&{0xc00011e1f8 [ErrTopicNotFound] <nil> [0xc000498a40] <nil>}&{0xc00011e240 [ErrSubscriptionNotFound] <nil> [0xc000498a80] <nil>}&{0xc00011e288 [ErrEmitterClosed] <nil> [0xc000498ac0] <nil>}&{0xc00011e2d0 [ErrBusClosed] <nil> [0xc000498b00] <nil>}&{0xc00011e318 [ErrStoreReadOnly] <nil> [0xc000498b40] <nil>}&{0xc00011e360 [ErrBufferFull] <nil> [0xc000498b80] <nil>}&{0xc00011e3a8 [ErrRetryLimitExceeded] <nil> [0xc000498bc0] <nil>}&{0xc00011e3f0 [ErrTimeout] <nil> [0xc000498c00] <nil>}
+var ErrEventNotFound = errors.New("event not found")	// ErrEventNotFound indicates an event was not found in the store
+
+var ErrInvalidEvent = errors.New("invalid event")	// ErrInvalidEvent indicates an event failed validation
+
+var ErrListenerNotFound = errors.New("listener not found")	// ErrListenerNotFound indicates a listener was not found
+
+var ErrTopicNotFound = errors.New("topic not found")	// ErrTopicNotFound indicates a topic was not found
+
+var ErrSubscriptionNotFound = errors.New("subscription not found")	// ErrSubscriptionNotFound indicates a subscription was not found
+
+var ErrEmitterClosed = errors.New("emitter is closed")	// ErrEmitterClosed indicates the emitter has been closed
+
+var ErrBusClosed = errors.New("bus is closed")	// ErrBusClosed indicates the bus has been closed
+
+var ErrStoreReadOnly = errors.New("store is read-only")	// ErrStoreReadOnly indicates the store is in read-only mode
+
+var ErrBufferFull = errors.New("buffer is full")	// ErrBufferFull indicates a buffer is full and cannot accept more events
+
+var ErrRetryLimitExceeded = errors.New("retry limit exceeded")	// ErrRetryLimitExceeded indicates retry attempts have been exhausted
+
+var ErrTimeout = errors.New("operation timed out")	// ErrTimeout indicates an operation timed out
+
 ```
 
-### DefaultEventValidator
+**DefaultEventValidator**
 
 DefaultEventValidator provides basic event validation
 
 
 ```go
-&{<nil> [DefaultEventValidator] <nil> [0xc0001c5f00] <nil>}
+var DefaultEventValidator = EventValidatorFunc(func(event Event) error {
+	if event == nil {
+		return NewValidationError("event", nil, "event cannot be nil")
+	}
+	if event.ID() == "" {
+		return NewValidationError("id", event.ID(), "event ID cannot be empty")
+	}
+	if event.Type() == "" {
+		return NewValidationError("type", event.Type(), "event type cannot be empty")
+	}
+	if event.Timestamp().IsZero() {
+		return NewValidationError("timestamp", event.Timestamp(), "event timestamp cannot be zero")
+	}
+	return nil
+})
 ```
 
 ## Types
@@ -38,11 +73,7 @@ BaseEvent provides a default implementation of the Event interface
 ```go
 // Create a new BaseEvent
 baseevent := BaseEvent{
-    id: "example",
-    eventType: "example",
-    timestamp: /* value */,
-    data: any{},
-    metadata: map[],
+
 }
 ```
 
@@ -50,23 +81,8 @@ baseevent := BaseEvent{
 
 ```go
 type BaseEvent struct {
-    id string
-    eventType string
-    timestamp time.Time
-    data any
-    metadata map[string]string
 }
 ```
-
-### Fields
-
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| id | `string` |  |
-| eventType | `string` |  |
-| timestamp | `time.Time` |  |
-| data | `any` |  |
-| metadata | `map[string]string` |  |
 
 ### Constructor Functions
 
@@ -139,7 +155,7 @@ func (*BaseEvent) GetMetadata(key string) (string, bool)
 ID returns the event ID
 
 ```go
-func (*BaseEvent) ID() string
+func (*BaseListener) ID() string
 ```
 
 **Parameters:**
@@ -213,9 +229,7 @@ BaseListener provides a basic implementation of Listener
 ```go
 // Create a new BaseListener
 baselistener := BaseListener{
-    id: "example",
-    handlerFunc: /* value */,
-    errorFunc: /* value */,
+
 }
 ```
 
@@ -223,19 +237,8 @@ baselistener := BaseListener{
 
 ```go
 type BaseListener struct {
-    id string
-    handlerFunc func(event Event) error
-    errorFunc func(event Event, err error) error
 }
 ```
-
-### Fields
-
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| id | `string` |  |
-| handlerFunc | `func(event Event) error` |  |
-| errorFunc | `func(event Event, err error) error` |  |
 
 ### Constructor Functions
 
@@ -323,12 +326,7 @@ BaseSubscription provides a default implementation of Subscription
 ```go
 // Create a new BaseSubscription
 basesubscription := BaseSubscription{
-    id: "example",
-    topic: "example",
-    listener: Listener{},
-    active: 42,
-    mu: /* value */,
-    onClose: /* value */,
+
 }
 ```
 
@@ -336,25 +334,8 @@ basesubscription := BaseSubscription{
 
 ```go
 type BaseSubscription struct {
-    id string
-    topic string
-    listener Listener
-    active int64
-    mu sync.RWMutex
-    onClose func()
 }
 ```
-
-### Fields
-
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| id | `string` |  |
-| topic | `string` |  |
-| listener | `Listener` |  |
-| active | `int64` | atomic boolean |
-| mu | `sync.RWMutex` |  |
-| onClose | `func()` |  |
 
 ### Constructor Functions
 
@@ -412,7 +393,7 @@ func (*BaseSubscription) Active() bool
 ID returns the subscription ID
 
 ```go
-func (*BaseListener) ID() string
+func (*BaseEvent) ID() string
 ```
 
 **Parameters:**
@@ -1134,7 +1115,6 @@ simplemetricscollector := SimpleMetricsCollector{
     StoreReads: 42,
     QueueSizes: map[],
     ActiveListeners: map[],
-    mu: /* value */,
 }
 ```
 
@@ -1151,7 +1131,6 @@ type SimpleMetricsCollector struct {
     StoreReads int64
     QueueSizes map[string]int64
     ActiveListeners map[string]int64
-    mu sync.RWMutex
 }
 ```
 
@@ -1168,7 +1147,6 @@ type SimpleMetricsCollector struct {
 | StoreReads | `int64` |  |
 | QueueSizes | `map[string]int64` |  |
 | ActiveListeners | `map[string]int64` |  |
-| mu | `sync.RWMutex` | protects QueueSizes and ActiveListeners maps |
 
 ### Constructor Functions
 
