@@ -1,5 +1,11 @@
 # Nova 🌟
 
+![GoVersion](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![Zero Dependencies](https://img.shields.io/badge/Zero-Dependencies-green.svg)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kolosys/nova.svg)](https://pkg.go.dev/github.com/kolosys/nova)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kolosys/nova)](https://goreportcard.com/report/github.com/kolosys/nova)
+
 **Production-ready event systems and messaging for Go, built on Ion's concurrency primitives.**
 
 [![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
