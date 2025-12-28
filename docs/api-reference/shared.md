@@ -247,12 +247,12 @@ type BaseListener struct {
 NewBaseListener creates a new BaseListener
 
 ```go
-func NewBaseListener(id string, handler func(event Event) error) *BaseListener
+func NewBaseListener(id string, handler func(ctx context.Context, event Event) error) *BaseListener
 ```
 
 **Parameters:**
 - `id` (string)
-- `handler` (func(event Event) error)
+- `handler` (func(ctx context.Context, event Event) error)
 
 **Returns:**
 - *BaseListener
@@ -262,13 +262,13 @@ func NewBaseListener(id string, handler func(event Event) error) *BaseListener
 NewBaseListenerWithErrorHandler creates a new BaseListener with error handling
 
 ```go
-func NewBaseListenerWithErrorHandler(id string, handler func(event Event) error, errorHandler func(event Event, err error) error) *BaseListener
+func NewBaseListenerWithErrorHandler(id string, handler func(ctx context.Context, event Event) error, errorHandler func(ctx context.Context, event Event, err error) error) *BaseListener
 ```
 
 **Parameters:**
 - `id` (string)
-- `handler` (func(event Event) error)
-- `errorHandler` (func(event Event, err error) error)
+- `handler` (func(ctx context.Context, event Event) error)
+- `errorHandler` (func(ctx context.Context, event Event, err error) error)
 
 **Returns:**
 - *BaseListener
@@ -280,10 +280,11 @@ func NewBaseListenerWithErrorHandler(id string, handler func(event Event) error,
 Handle processes an event
 
 ```go
-func (*BaseListener) Handle(event Event) error
+func (*BaseListener) Handle(ctx context.Context, event Event) error
 ```
 
 **Parameters:**
+- `ctx` (context.Context)
 - `event` (Event)
 
 **Returns:**
@@ -294,7 +295,7 @@ func (*BaseListener) Handle(event Event) error
 ID returns the listener ID
 
 ```go
-func (*BaseListener) ID() string
+func (*BaseEvent) ID() string
 ```
 
 **Parameters:**
@@ -308,10 +309,11 @@ func (*BaseListener) ID() string
 OnError handles errors
 
 ```go
-func (*BaseListener) OnError(event Event, err error) error
+func (*BaseListener) OnError(ctx context.Context, event Event, err error) error
 ```
 
 **Parameters:**
+- `ctx` (context.Context)
 - `event` (Event)
 - `err` (error)
 
@@ -657,12 +659,12 @@ func (m MyListener) ID() string {
     return
 }
 
-func (m MyListener) Handle(param1 Event) error {
+func (m MyListener) Handle(param1 context.Context, param2 Event) error {
     // Implement your logic here
     return
 }
 
-func (m MyListener) OnError(param1 Event, param2 error) error {
+func (m MyListener) OnError(param1 context.Context, param2 Event, param3 error) error {
     // Implement your logic here
     return
 }
@@ -675,8 +677,8 @@ func (m MyListener) OnError(param1 Event, param2 error) error {
 ```go
 type Listener interface {
     ID() string
-    Handle(event Event) error
-    OnError(event Event, err error) error
+    Handle(ctx context.Context, event Event) error
+    OnError(ctx context.Context, event Event, err error) error
 }
 ```
 
@@ -856,12 +858,12 @@ type MyMiddleware struct {
     // Add your fields here
 }
 
-func (m MyMiddleware) Before(param1 Event) error {
+func (m MyMiddleware) Before(param1 context.Context, param2 Event) error {
     // Implement your logic here
     return
 }
 
-func (m MyMiddleware) After(param1 Event, param2 error) error {
+func (m MyMiddleware) After(param1 context.Context, param2 Event, param3 error) error {
     // Implement your logic here
     return
 }
@@ -873,8 +875,8 @@ func (m MyMiddleware) After(param1 Event, param2 error) error {
 
 ```go
 type Middleware interface {
-    Before(event Event) error
-    After(event Event, err error) error
+    Before(ctx context.Context, event Event) error
+    After(ctx context.Context, event Event, err error) error
 }
 ```
 
@@ -900,8 +902,8 @@ middlewarefunc := MiddlewareFunc{
 
 ```go
 type MiddlewareFunc struct {
-    BeforeFunc func(event Event) error
-    AfterFunc func(event Event, err error) error
+    BeforeFunc func(ctx context.Context, event Event) error
+    AfterFunc func(ctx context.Context, event Event, err error) error
 }
 ```
 
@@ -909,8 +911,8 @@ type MiddlewareFunc struct {
 
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| BeforeFunc | `func(event Event) error` |  |
-| AfterFunc | `func(event Event, err error) error` |  |
+| BeforeFunc | `func(ctx context.Context, event Event) error` |  |
+| AfterFunc | `func(ctx context.Context, event Event, err error) error` |  |
 
 ## Methods
 
@@ -919,10 +921,11 @@ type MiddlewareFunc struct {
 After implements Middleware
 
 ```go
-func (MiddlewareFunc) After(event Event, err error) error
+func (MiddlewareFunc) After(ctx context.Context, event Event, err error) error
 ```
 
 **Parameters:**
+- `ctx` (context.Context)
 - `event` (Event)
 - `err` (error)
 
@@ -934,10 +937,11 @@ func (MiddlewareFunc) After(event Event, err error) error
 Before implements Middleware
 
 ```go
-func (MiddlewareFunc) Before(event Event) error
+func (MiddlewareFunc) Before(ctx context.Context, event Event) error
 ```
 
 **Parameters:**
+- `ctx` (context.Context)
 - `event` (Event)
 
 **Returns:**

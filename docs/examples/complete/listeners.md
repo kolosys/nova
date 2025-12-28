@@ -26,9 +26,9 @@ func (l *UserEventListener) ID() string {
 	return l.id
 }
 
-func (l *UserEventListener) Handle(event shared.Event) error {
+func (l *UserEventListener) Handle(_ context.Context, event shared.Event) error {
 	atomic.AddInt64(&l.eventsHandled, 1)
-	
+
 	switch event.Type() {
 	case "user.created":
 		return l.handleUserCreated(event)
@@ -37,11 +37,11 @@ func (l *UserEventListener) Handle(event shared.Event) error {
 	default:
 		fmt.Printf("👤 User listener received unknown event type: %s\n", event.Type())
 	}
-	
+
 	return nil
 }
 
-func (l *UserEventListener) OnError(event shared.Event, err error) error {
+func (l *UserEventListener) OnError(_ context.Context, event shared.Event, err error) error {
 	fmt.Printf("❌ User listener error for event %s: %v\n", event.ID(), err)
 	return err
 }
@@ -90,9 +90,9 @@ func (l *OrderEventListener) ID() string {
 	return l.id
 }
 
-func (l *OrderEventListener) Handle(event shared.Event) error {
+func (l *OrderEventListener) Handle(_ context.Context, event shared.Event) error {
 	atomic.AddInt64(&l.eventsHandled, 1)
-	
+
 	switch event.Type() {
 	case "order.created":
 		return l.handleOrderCreated(event)
@@ -103,11 +103,11 @@ func (l *OrderEventListener) Handle(event shared.Event) error {
 	default:
 		fmt.Printf("🛒 Order listener received unknown event type: %s\n", event.Type())
 	}
-	
+
 	return nil
 }
 
-func (l *OrderEventListener) OnError(event shared.Event, err error) error {
+func (l *OrderEventListener) OnError(_ context.Context, event shared.Event, err error) error {
 	fmt.Printf("❌ Order listener error for event %s: %v\n", event.ID(), err)
 	return err
 }
@@ -165,9 +165,9 @@ func (l *AuditEventListener) ID() string {
 	return l.id
 }
 
-func (l *AuditEventListener) Handle(event shared.Event) error {
+func (l *AuditEventListener) Handle(ctx context.Context, event shared.Event) error {
 	atomic.AddInt64(&l.eventsHandled, 1)
-	
+
 	// Store in audit log
 	auditEvent := shared.NewBaseEventWithMetadata(
 		fmt.Sprintf("audit-%s", event.ID()),
@@ -183,23 +183,23 @@ func (l *AuditEventListener) Handle(event shared.Event) error {
 			"audit_source":    "audit-listener",
 		},
 	)
-	
-	if err := l.store.Append(context.Background(), "audit-trail", auditEvent); err != nil {
+
+	if err := l.store.Append(ctx, "audit-trail", auditEvent); err != nil {
 		fmt.Printf("❌ Failed to store audit event: %v\n", err)
 		return err
 	}
-	
+
 	// Occasionally print audit summary (every 10th event)
 	if l.eventsHandled%10 == 0 {
 		fmt.Printf("📝 Audit: Logged %d events total\n", l.eventsHandled)
 	}
-	
+
 	return nil
 }
 
-func (l *AuditEventListener) OnError(event shared.Event, err error) error {
+func (l *AuditEventListener) OnError(ctx context.Context, event shared.Event, err error) error {
 	fmt.Printf("❌ Audit listener error for event %s: %v\n", event.ID(), err)
-	
+
 	// Try to log the error itself
 	errorEvent := shared.NewBaseEventWithMetadata(
 		fmt.Sprintf("audit-error-%s", event.ID()),
@@ -213,9 +213,9 @@ func (l *AuditEventListener) OnError(event shared.Event, err error) error {
 			"audit_source":    "audit-listener-error",
 		},
 	)
-	
-	_ = l.store.Append(context.Background(), "audit-errors", errorEvent)
-	
+
+	_ = l.store.Append(ctx, "audit-errors", errorEvent)
+
 	return err
 }
 
