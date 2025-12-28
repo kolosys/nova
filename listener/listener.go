@@ -275,6 +275,7 @@ type listenerStats struct {
 
 // retryJob represents a queued retry
 type retryJob struct {
+	ctx         context.Context // Parent context for propagation
 	event       shared.Event
 	attempt     int
 	lastError   error
@@ -599,7 +600,7 @@ func (lm *listenerManager) processEventWithListener(ctx context.Context, ml *man
 
 func (lm *listenerManager) handleEventWithListener(ctx context.Context, ml *managedListener, event shared.Event) error {
 	start := time.Now()
-	err := ml.listener.Handle(event)
+	err := ml.listener.Handle(ctx, event)
 	duration := time.Since(start)
 
 	// Update metrics
@@ -623,6 +624,7 @@ func (lm *listenerManager) handleEventWithListener(ctx context.Context, ml *mana
 		// Check if error is retryable
 		if lm.shouldRetry(ml, err, 1) {
 			retryJob := retryJob{
+				ctx:         ctx,
 				event:       event,
 				attempt:     1,
 				lastError:   err,
@@ -701,7 +703,11 @@ func (lm *listenerManager) processRetryQueue(ml *managedListener) {
 
 func (lm *listenerManager) processRetryJob(ml *managedListener, job retryJob) {
 	start := time.Now()
-	err := ml.listener.Handle(job.event)
+	ctx := job.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	err := ml.listener.Handle(ctx, job.event)
 	duration := time.Since(start)
 
 	lm.metrics.ObserveListenerDuration(ml.listener.ID(), duration)
@@ -717,6 +723,7 @@ func (lm *listenerManager) processRetryJob(ml *managedListener, job retryJob) {
 		// Check if we should retry again
 		if lm.shouldRetry(ml, err, job.attempt+1) {
 			nextJob := retryJob{
+				ctx:         ctx,
 				event:       job.event,
 				attempt:     job.attempt + 1,
 				lastError:   err,

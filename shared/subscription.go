@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 )
@@ -77,12 +78,12 @@ func (s *BaseSubscription) Active() bool {
 // BaseListener provides a basic implementation of Listener
 type BaseListener struct {
 	id          string
-	handlerFunc func(event Event) error
-	errorFunc   func(event Event, err error) error
+	handlerFunc func(ctx context.Context, event Event) error
+	errorFunc   func(ctx context.Context, event Event, err error) error
 }
 
 // NewBaseListener creates a new BaseListener
-func NewBaseListener(id string, handler func(event Event) error) *BaseListener {
+func NewBaseListener(id string, handler func(ctx context.Context, event Event) error) *BaseListener {
 	return &BaseListener{
 		id:          id,
 		handlerFunc: handler,
@@ -90,7 +91,7 @@ func NewBaseListener(id string, handler func(event Event) error) *BaseListener {
 }
 
 // NewBaseListenerWithErrorHandler creates a new BaseListener with error handling
-func NewBaseListenerWithErrorHandler(id string, handler func(event Event) error, errorHandler func(event Event, err error) error) *BaseListener {
+func NewBaseListenerWithErrorHandler(id string, handler func(ctx context.Context, event Event) error, errorHandler func(ctx context.Context, event Event, err error) error) *BaseListener {
 	return &BaseListener{
 		id:          id,
 		handlerFunc: handler,
@@ -104,18 +105,17 @@ func (l *BaseListener) ID() string {
 }
 
 // Handle processes an event
-func (l *BaseListener) Handle(event Event) error {
+func (l *BaseListener) Handle(ctx context.Context, event Event) error {
 	if l.handlerFunc == nil {
 		return nil
 	}
-	return l.handlerFunc(event)
+	return l.handlerFunc(ctx, event)
 }
 
 // OnError handles errors
-func (l *BaseListener) OnError(event Event, err error) error {
+func (l *BaseListener) OnError(ctx context.Context, event Event, err error) error {
 	if l.errorFunc != nil {
-		return l.errorFunc(event, err)
+		return l.errorFunc(ctx, event, err)
 	}
-	// Default: just return the original error
 	return err
 }

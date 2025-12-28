@@ -186,6 +186,7 @@ type patternSubscription struct {
 
 // eventJob represents a queued event for processing
 type eventJob struct {
+	ctx         context.Context // Parent context for cancellation and deadline propagation
 	event       shared.Event
 	topic       string
 	partition   int
@@ -252,8 +253,9 @@ func (b *eventBus) Publish(ctx context.Context, topicName string, event shared.E
 	partitionID := b.selectPartition(t, event)
 	partition := t.partitions[partitionID]
 
-	// Create event job
+	// Create event job with context for propagation
 	job := eventJob{
+		ctx:         ctx,
 		event:       event,
 		topic:       topicName,
 		partition:   partitionID,
@@ -682,8 +684,8 @@ func (b *eventBus) processEventJob(t *topic, p *partition, job eventJob) {
 			continue
 		}
 
-		// Submit to worker pool for concurrent processing
-		err := b.workerpool.Submit(context.Background(), func(ctx context.Context) error {
+		// Submit to worker pool for concurrent processing with propagated context
+		err := b.workerpool.Submit(job.ctx, func(ctx context.Context) error {
 			return b.handleEventForSubscriber(ctx, job.event, sub)
 		})
 
@@ -720,14 +722,14 @@ func (b *eventBus) processEventJob(t *topic, p *partition, job eventJob) {
 func (b *eventBus) handleEventForSubscriber(ctx context.Context, event shared.Event, sub *subscription) error {
 	start := time.Now()
 
-	err := sub.Listener().Handle(event)
+	err := sub.Listener().Handle(ctx, event)
 
 	duration := time.Since(start)
 	b.metrics.ObserveListenerDuration(sub.Listener().ID(), duration)
 
 	if err != nil {
-		// Call error handler
-		if handlerErr := sub.Listener().OnError(event, err); handlerErr != nil {
+		// Call error handler with context
+		if handlerErr := sub.Listener().OnError(ctx, event, err); handlerErr != nil {
 			return shared.NewListenerError(sub.Listener().ID(), event, handlerErr)
 		}
 		return shared.NewListenerError(sub.Listener().ID(), event, err)

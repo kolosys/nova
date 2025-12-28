@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"time"
 )
 
@@ -103,11 +104,11 @@ type Listener interface {
 	// ID returns the unique identifier for this listener
 	ID() string
 
-	// Handle processes an event
-	Handle(event Event) error
+	// Handle processes an event with context for cancellation and deadline propagation
+	Handle(ctx context.Context, event Event) error
 
 	// OnError is called when Handle returns an error
-	OnError(event Event, err error) error
+	OnError(ctx context.Context, event Event, err error) error
 }
 
 // Subscription represents an active subscription to events
@@ -131,30 +132,30 @@ type Subscription interface {
 // Middleware provides hooks for cross-cutting concerns
 type Middleware interface {
 	// Before is called before event processing
-	Before(event Event) error
+	Before(ctx context.Context, event Event) error
 
 	// After is called after event processing (err may be nil)
-	After(event Event, err error) error
+	After(ctx context.Context, event Event, err error) error
 }
 
 // MiddlewareFunc is a function adapter for Middleware
 type MiddlewareFunc struct {
-	BeforeFunc func(event Event) error
-	AfterFunc  func(event Event, err error) error
+	BeforeFunc func(ctx context.Context, event Event) error
+	AfterFunc  func(ctx context.Context, event Event, err error) error
 }
 
 // Before implements Middleware
-func (mf MiddlewareFunc) Before(event Event) error {
+func (mf MiddlewareFunc) Before(ctx context.Context, event Event) error {
 	if mf.BeforeFunc != nil {
-		return mf.BeforeFunc(event)
+		return mf.BeforeFunc(ctx, event)
 	}
 	return nil
 }
 
 // After implements Middleware
-func (mf MiddlewareFunc) After(event Event, err error) error {
+func (mf MiddlewareFunc) After(ctx context.Context, event Event, err error) error {
 	if mf.AfterFunc != nil {
-		return mf.AfterFunc(event, err)
+		return mf.AfterFunc(ctx, event, err)
 	}
 	return nil
 }

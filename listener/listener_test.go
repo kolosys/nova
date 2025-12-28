@@ -19,8 +19,8 @@ type testListener struct {
 	events     []shared.Event
 	errors     []error
 	mu         sync.RWMutex
-	handleFn   func(event shared.Event) error
-	errorFn    func(event shared.Event, err error) error
+	handleFn   func(ctx context.Context, event shared.Event) error
+	errorFn    func(ctx context.Context, event shared.Event, err error) error
 	callCount  int64
 	failCount  int64
 	shouldFail bool
@@ -38,7 +38,7 @@ func (l *testListener) ID() string {
 	return l.id
 }
 
-func (l *testListener) Handle(event shared.Event) error {
+func (l *testListener) Handle(ctx context.Context, event shared.Event) error {
 	atomic.AddInt64(&l.callCount, 1)
 
 	l.mu.Lock()
@@ -52,19 +52,19 @@ func (l *testListener) Handle(event shared.Event) error {
 	}
 
 	if l.handleFn != nil {
-		return l.handleFn(event)
+		return l.handleFn(ctx, event)
 	}
 	return nil
 }
 
-func (l *testListener) OnError(event shared.Event, err error) error {
+func (l *testListener) OnError(ctx context.Context, event shared.Event, err error) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	l.errors = append(l.errors, err)
 
 	if l.errorFn != nil {
-		return l.errorFn(event, err)
+		return l.errorFn(ctx, event, err)
 	}
 	return err
 }

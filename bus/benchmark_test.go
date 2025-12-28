@@ -25,12 +25,12 @@ func (l *benchmarkListener) ID() string {
 	return l.id
 }
 
-func (l *benchmarkListener) Handle(shared.Event) error {
+func (l *benchmarkListener) Handle(_ context.Context, _ shared.Event) error {
 	l.count++
 	return nil
 }
 
-func (l *benchmarkListener) OnError(shared.Event, error) error {
+func (l *benchmarkListener) OnError(_ context.Context, _ shared.Event, _ error) error {
 	return nil
 }
 
@@ -311,7 +311,7 @@ func (l *heavyBenchmarkListener) ID() string {
 	return l.id
 }
 
-func (l *heavyBenchmarkListener) Handle(shared.Event) error {
+func (l *heavyBenchmarkListener) Handle(_ context.Context, _ shared.Event) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.count++
@@ -320,7 +320,7 @@ func (l *heavyBenchmarkListener) Handle(shared.Event) error {
 	return nil
 }
 
-func (l *heavyBenchmarkListener) OnError(shared.Event, error) error {
+func (l *heavyBenchmarkListener) OnError(_ context.Context, _ shared.Event, _ error) error {
 	return nil
 }
 

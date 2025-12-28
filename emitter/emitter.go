@@ -96,6 +96,7 @@ type subscription struct {
 
 // eventJob represents a queued event
 type eventJob struct {
+	ctx      context.Context // Parent context for cancellation and deadline propagation
 	event    shared.Event
 	subs     []*subscription
 	resultCh chan error
@@ -153,7 +154,7 @@ func (e *emitter) Emit(ctx context.Context, event shared.Event) error {
 
 	// Apply middleware before processing
 	for _, mw := range e.middleware {
-		if err := mw.Before(event); err != nil {
+		if err := mw.Before(ctx, event); err != nil {
 			atomic.AddInt64(&e.stats.MiddlewareErrors, 1)
 			return shared.NewEventError(event, err)
 		}
@@ -178,7 +179,7 @@ func (e *emitter) Emit(ctx context.Context, event shared.Event) error {
 
 	// Apply middleware after processing
 	for i := len(e.middleware) - 1; i >= 0; i-- {
-		if err := e.middleware[i].After(event, processingErr); err != nil {
+		if err := e.middleware[i].After(ctx, event, processingErr); err != nil {
 			atomic.AddInt64(&e.stats.MiddlewareErrors, 1)
 			return shared.NewEventError(event, err)
 		}
@@ -209,7 +210,7 @@ func (e *emitter) EmitAsync(ctx context.Context, event shared.Event) error {
 
 	// Apply middleware before processing
 	for _, mw := range e.middleware {
-		if err := mw.Before(event); err != nil {
+		if err := mw.Before(ctx, event); err != nil {
 			atomic.AddInt64(&e.stats.MiddlewareErrors, 1)
 			return shared.NewEventError(event, err)
 		}
@@ -223,8 +224,9 @@ func (e *emitter) EmitAsync(ctx context.Context, event shared.Event) error {
 		return nil
 	}
 
-	// Queue for async processing
+	// Queue for async processing with context
 	job := eventJob{
+		ctx:   ctx,
 		event: event,
 		subs:  subs,
 	}
@@ -373,9 +375,15 @@ func (e *emitter) processEvents() {
 func (e *emitter) processEventJob(job eventJob) {
 	var processingErr error
 
+	// Use stored context from job for proper propagation
+	ctx := job.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	// Process all subscriptions for this event
 	for _, sub := range job.subs {
-		if err := e.processEventForSubscription(context.Background(), job.event, sub); err != nil {
+		if err := e.processEventForSubscription(ctx, job.event, sub); err != nil {
 			processingErr = err
 			break
 		}
@@ -383,7 +391,7 @@ func (e *emitter) processEventJob(job eventJob) {
 
 	// Apply middleware after processing
 	for i := len(e.middleware) - 1; i >= 0; i-- {
-		if err := e.middleware[i].After(job.event, processingErr); err != nil {
+		if err := e.middleware[i].After(ctx, job.event, processingErr); err != nil {
 			atomic.AddInt64(&e.stats.MiddlewareErrors, 1)
 			processingErr = err
 		}
@@ -439,7 +447,7 @@ func (e *emitter) processEventForSubscription(ctx context.Context, event shared.
 func (e *emitter) handleEventWithListener(ctx context.Context, event shared.Event, listener shared.Listener) error {
 	start := time.Now()
 
-	err := listener.Handle(event)
+	err := listener.Handle(ctx, event)
 
 	duration := time.Since(start)
 	e.metrics.ObserveListenerDuration(listener.ID(), duration)
@@ -448,8 +456,8 @@ func (e *emitter) handleEventWithListener(ctx context.Context, event shared.Even
 		atomic.AddInt64(&e.stats.FailedEvents, 1)
 		e.metrics.IncEventsProcessed(listener.ID(), "failed")
 
-		// Call error handler
-		if handlerErr := listener.OnError(event, err); handlerErr != nil {
+		// Call error handler with context
+		if handlerErr := listener.OnError(ctx, event, err); handlerErr != nil {
 			return shared.NewListenerError(listener.ID(), event, handlerErr)
 		}
 		return shared.NewListenerError(listener.ID(), event, err)

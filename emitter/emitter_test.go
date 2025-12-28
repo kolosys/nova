@@ -17,7 +17,7 @@ type testListener struct {
 	events   []shared.Event
 	errors   []error
 	mu       sync.RWMutex
-	handleFn func(event shared.Event) error
+	handleFn func(ctx context.Context, event shared.Event) error
 }
 
 func newTestListener(id string) *testListener {
@@ -32,19 +32,19 @@ func (l *testListener) ID() string {
 	return l.id
 }
 
-func (l *testListener) Handle(event shared.Event) error {
+func (l *testListener) Handle(ctx context.Context, event shared.Event) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	l.events = append(l.events, event)
 
 	if l.handleFn != nil {
-		return l.handleFn(event)
+		return l.handleFn(ctx, event)
 	}
 	return nil
 }
 
-func (l *testListener) OnError(event shared.Event, err error) error {
+func (l *testListener) OnError(_ context.Context, event shared.Event, err error) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
